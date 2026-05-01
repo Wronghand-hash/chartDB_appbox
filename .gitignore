@@ -1,0 +1,39 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Bun (project standardizes on npm / package-lock.json)
+bun.lock
+bun.lockb
+
+node_modules
+dist
+dist-ssr
+*.local
+.env
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+
+/.next
+
+# Supabase CLI local state
+supabase/.branches
+supabase/.temp
+
+# TypeScript incremental build info
+tsconfig.tsbuildinfo
