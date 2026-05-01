@@ -1,0 +1,1 @@
+-- Optional seed data for `supabase db reset`. ChartDB does not require seeds.
