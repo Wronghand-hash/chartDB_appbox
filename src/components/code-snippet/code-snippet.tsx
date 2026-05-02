@@ -11,7 +11,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../tooltip/tooltip';
 import { useTranslation } from 'react-i18next';
 import { DarkTheme } from './themes/dark';
 import { LightTheme } from './themes/light';
-import './config.ts';
 
 export const Editor = lazy(() =>
     import('./code-editor').then((module) => ({

@@ -47,6 +47,21 @@ export default defineConfig(({ mode }) => {
             rollupOptions: {
                 external: (id) => /__test__/.test(id),
                 output: {
+                    manualChunks(id) {
+                        if (id.includes('node_modules/monaco-editor')) {
+                            return 'monaco';
+                        }
+                        if (
+                            id.includes('node_modules/@monaco-editor/react') ||
+                            id.includes('node_modules/@monaco-editor/loader')
+                        ) {
+                            return 'monaco-react';
+                        }
+                        if (id.includes('node_modules/@xyflow')) {
+                            return 'xyflow';
+                        }
+                        return undefined;
+                    },
                     assetFileNames: (assetInfo) => {
                         if (
                             assetInfo.names &&

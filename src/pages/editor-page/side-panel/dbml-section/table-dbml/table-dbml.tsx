@@ -30,6 +30,7 @@ import { parseDBMLError } from '@/lib/dbml/dbml-import/dbml-import-error';
 import {
     clearErrorHighlight,
     highlightErrorLine,
+    type MonacoRuntime,
 } from '@/components/code-snippet/dbml/utils';
 import {
     registerDBMLCompletionProvider,
@@ -64,12 +65,14 @@ export const TableDBML: React.FC<TableDBMLProps> = () => {
     const decorationsCollection =
         useRef<monaco.editor.IEditorDecorationsCollection>();
     const completionManagerRef = useRef<DBMLCompletionManager>();
+    const monacoNsRef = useRef<MonacoRuntime | null>(null);
 
     const handleEditorDidMount = useCallback(
         (
             editor: monaco.editor.IStandaloneCodeEditor,
             monacoInstance: Monaco
         ) => {
+            monacoNsRef.current = monacoInstance as unknown as MonacoRuntime;
             editorRef.current = editor;
             decorationsCollection.current =
                 editor.createDecorationsCollection();
@@ -244,8 +247,9 @@ export const TableDBML: React.FC<TableDBMLProps> = () => {
             } catch (error) {
                 const dbmlError = parseDBMLError(error);
 
-                if (dbmlError) {
+                if (dbmlError && monacoNsRef.current) {
                     highlightErrorLine({
+                        monaco: monacoNsRef.current,
                         error: dbmlError,
                         model: editorRef.current?.getModel(),
                         editorDecorationsCollection:

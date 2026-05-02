@@ -31,7 +31,7 @@ import {
     ResizablePanelGroup,
 } from '@/components/resizable/resizable';
 import { useTheme } from '@/hooks/use-theme';
-import type { OnChange } from '@monaco-editor/react';
+import type { Monaco, OnChange } from '@monaco-editor/react';
 import { useDebounce } from '@/hooks/use-debounce-v2';
 import { InstructionsSection } from './instructions-section/instructions-section';
 import { parseSQLError } from '@/lib/data/sql-import';
@@ -51,6 +51,7 @@ import { sqlImportToDiagram } from '@/lib/data/sql-import';
 import {
     clearErrorHighlight,
     highlightErrorLine,
+    type MonacoRuntime,
 } from '@/components/code-snippet/dbml/utils';
 
 const calculateContentSizeMB = (content: string): number => {
@@ -103,6 +104,7 @@ export const ImportDatabase: React.FC<ImportDatabaseProps> = ({
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
     const decorationsCollection = useRef<editor.IEditorDecorationsCollection>();
     const pasteDisposableRef = useRef<IDisposable | null>(null);
+    const monacoNsRef = useRef<MonacoRuntime | null>(null);
 
     const { t } = useTranslation();
     const { isSm: isDesktop } = useBreakpoint('sm');
@@ -181,12 +183,15 @@ export const ImportDatabase: React.FC<ImportDatabaseProps> = ({
                 if (validateResponse.parsedError) {
                     errorMsg = validateResponse.parsedError.message;
                     line = validateResponse.parsedError.line;
-                    highlightErrorLine({
-                        error: validateResponse.parsedError,
-                        model: editorRef.current?.getModel(),
-                        editorDecorationsCollection:
-                            decorationsCollection.current,
-                    });
+                    if (monacoNsRef.current) {
+                        highlightErrorLine({
+                            monaco: monacoNsRef.current,
+                            error: validateResponse.parsedError,
+                            model: editorRef.current?.getModel(),
+                            editorDecorationsCollection:
+                                decorationsCollection.current,
+                        });
+                    }
                 }
 
                 setSqlValidation({
@@ -393,10 +398,14 @@ export const ImportDatabase: React.FC<ImportDatabaseProps> = ({
     }, [importMethod]);
 
     const handleEditorDidMount = useCallback(
-        (editor: editor.IStandaloneCodeEditor) => {
-            editorRef.current = editor;
+        (
+            editorInstance: editor.IStandaloneCodeEditor,
+            monacoNs: Monaco
+        ) => {
+            monacoNsRef.current = monacoNs as unknown as MonacoRuntime;
+            editorRef.current = editorInstance;
             decorationsCollection.current =
-                editor.createDecorationsCollection();
+                editorInstance.createDecorationsCollection();
 
             // Cleanup previous disposable if it exists
             if (pasteDisposableRef.current) {
@@ -405,8 +414,8 @@ export const ImportDatabase: React.FC<ImportDatabaseProps> = ({
             }
 
             // Add paste handler for all modes
-            const disposable = editor.onDidPaste(() => {
-                const model = editor.getModel();
+            const disposable = editorInstance.onDidPaste(() => {
+                const model = editorInstance.getModel();
                 if (!model) return;
 
                 const content = model.getValue();
@@ -425,7 +434,7 @@ export const ImportDatabase: React.FC<ImportDatabaseProps> = ({
                     if (detectedType === 'query' && !isLargeFile) {
                         // For JSON mode, format after a short delay
                         setTimeout(() => {
-                            editor
+                            editorInstance
                                 .getAction('editor.action.formatDocument')
                                 ?.run();
                         }, 100);
@@ -436,7 +445,7 @@ export const ImportDatabase: React.FC<ImportDatabaseProps> = ({
                     if (currentMethod === 'query' && !isLargeFile) {
                         // Only format JSON content if not too large
                         setTimeout(() => {
-                            editor
+                            editorInstance
                                 .getAction('editor.action.formatDocument')
                                 ?.run();
                         }, 100);

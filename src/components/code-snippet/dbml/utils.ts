@@ -1,15 +1,20 @@
 import type { DBMLError } from '@/lib/dbml/dbml-import/dbml-import-error';
-import * as monaco from 'monaco-editor';
+import type * as Monaco from 'monaco-editor';
+
+/** Full monaco module (passed from editor `onMount`); avoids static `monaco-editor` import in this file. */
+export type MonacoRuntime = typeof import('monaco-editor');
 
 export const highlightErrorLine = ({
+    monaco,
     error,
     model,
     editorDecorationsCollection,
 }: {
+    monaco: MonacoRuntime;
     error: DBMLError;
-    model?: monaco.editor.ITextModel | null;
+    model?: Monaco.editor.ITextModel | null;
     editorDecorationsCollection:
-        | monaco.editor.IEditorDecorationsCollection
+        | Monaco.editor.IEditorDecorationsCollection
         | undefined;
 }) => {
     if (!model) return;
@@ -42,7 +47,7 @@ export const highlightErrorLine = ({
 
 export const clearErrorHighlight = (
     editorDecorationsCollection:
-        | monaco.editor.IEditorDecorationsCollection
+        | Monaco.editor.IEditorDecorationsCollection
         | undefined
 ) => {
     if (editorDecorationsCollection) {
