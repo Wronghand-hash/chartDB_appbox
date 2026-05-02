@@ -8,10 +8,11 @@ import {
     supabaseAuthContext,
     type SupabaseAuthContextValue,
 } from './supabase-auth-context';
+import { parseChartdbOrgIdFromRpc } from '@/lib/chartdb/shared-team-org';
 
-export const SupabaseAuthProvider: React.FC<React.PropsWithChildren> = ({
+export const SupabaseAuthProvider = ({
     children,
-}) => {
+}: React.PropsWithChildren) => {
     const [ready, setReady] = useState(!isSupabaseConfigured());
     const [session, setSession] = useState<Session | null>(null);
     const [orgId, setOrgId] = useState<string | null>(null);
@@ -30,7 +31,7 @@ export const SupabaseAuthProvider: React.FC<React.PropsWithChildren> = ({
             setOrgId(null);
             return;
         }
-        setOrgId(typeof data === 'string' ? data : null);
+        setOrgId(parseChartdbOrgIdFromRpc(data));
     }, []);
 
     useEffect(() => {
