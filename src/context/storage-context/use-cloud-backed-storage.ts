@@ -6,7 +6,10 @@ import {
     getSupabaseBrowserClient,
     isSupabaseConfigured,
 } from '@/lib/supabase/client';
-import { diagramToSnapshot, snapshotRowToDiagram } from '@/lib/supabase/diagram-snapshot';
+import {
+    diagramToSnapshot,
+    snapshotRowToDiagram,
+} from '@/lib/supabase/diagram-snapshot';
 import type { Diagram } from '@/lib/domain/diagram';
 
 const DEBOUNCE_MS = 1400;
@@ -24,10 +27,7 @@ function totalDiagramFieldCount(diagram: Diagram | undefined): number {
     if (!diagram?.tables?.length) {
         return 0;
     }
-    return diagram.tables.reduce(
-        (sum, t) => sum + (t.fields?.length ?? 0),
-        0
-    );
+    return diagram.tables.reduce((sum, t) => sum + (t.fields?.length ?? 0), 0);
 }
 
 type ListArgs = Parameters<StorageContext['listDiagrams']>;
@@ -205,9 +205,7 @@ export function useCloudBackedStorage(
             }
             const { data, error } = await supabase
                 .from('chartdb_diagrams')
-                .select(
-                    'id,name,snapshot,created_at,updated_at,org_id'
-                )
+                .select('id,name,snapshot,created_at,updated_at,org_id')
                 .eq('org_id', orgId)
                 .order('updated_at', { ascending: false });
             if (error) {
@@ -249,14 +247,11 @@ export function useCloudBackedStorage(
             }
 
             const local = await inner().getDiagram(id, options);
-            const remoteUpdated = row
-                ? new Date(row.updated_at).getTime()
-                : 0;
+            const remoteUpdated = row ? new Date(row.updated_at).getTime() : 0;
             const localUpdated = local?.updatedAt.getTime() ?? 0;
 
             const localFull =
-                (await inner().getDiagram(id, fullDiagramLoadOptions)) ??
-                local;
+                (await inner().getDiagram(id, fullDiagramLoadOptions)) ?? local;
             const remoteDiagram = row
                 ? snapshotRowToDiagram(
                       {
@@ -280,8 +275,7 @@ export function useCloudBackedStorage(
             const remoteWouldWipeLocalColumns =
                 !!localFull && localFields > 0 && remoteFields === 0;
 
-            const remoteIsStrictlyNewerThanLocal =
-                remoteUpdated > localUpdated;
+            const remoteIsStrictlyNewerThanLocal = remoteUpdated > localUpdated;
 
             if (
                 row &&
@@ -289,7 +283,9 @@ export function useCloudBackedStorage(
                 !remoteWouldWipeLocalColumns &&
                 (!local || remoteIsStrictlyNewerThanLocal)
             ) {
-                await inner().deleteDiagram(id).catch(() => undefined);
+                await inner()
+                    .deleteDiagram(id)
+                    .catch(() => undefined);
                 await inner().addDiagram({ diagram: remoteDiagram });
             }
 
@@ -359,5 +355,5 @@ export function useCloudBackedStorage(
                 };
             },
         }) as StorageContext;
-    }, [cloudActive, orgId, session?.user?.id, supabase, ready]);
+    }, [cloudActive, orgId, session, supabase, innerRef]);
 }

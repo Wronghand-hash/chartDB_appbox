@@ -44,7 +44,9 @@ export const LoginPage: React.FC = () => {
                 }
             } catch (err: unknown) {
                 const message =
-                    err instanceof Error ? err.message : 'Authentication failed';
+                    err instanceof Error
+                        ? err.message
+                        : 'Authentication failed';
                 setError(message);
             } finally {
                 setBusy(false);
@@ -118,7 +120,9 @@ export const LoginPage: React.FC = () => {
                             <p className="text-sm text-destructive">{error}</p>
                         ) : null}
                         {info ? (
-                            <p className="text-sm text-muted-foreground">{info}</p>
+                            <p className="text-sm text-muted-foreground">
+                                {info}
+                            </p>
                         ) : null}
                         <Button
                             type="submit"

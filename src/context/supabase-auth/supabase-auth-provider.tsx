@@ -22,7 +22,9 @@ export const SupabaseAuthProvider: React.FC<React.PropsWithChildren> = ({
             setOrgId(null);
             return;
         }
-        const { data, error } = await supabase.rpc('chartdb_ensure_default_org');
+        const { data, error } = await supabase.rpc(
+            'chartdb_ensure_default_org'
+        );
         if (error) {
             console.error('chartdb_ensure_default_org', error);
             setOrgId(null);
@@ -122,14 +124,7 @@ export const SupabaseAuthProvider: React.FC<React.PropsWithChildren> = ({
             signUpWithPassword,
             signOut,
         }),
-        [
-            ready,
-            session,
-            orgId,
-            signInWithPassword,
-            signUpWithPassword,
-            signOut,
-        ]
+        [ready, session, orgId, signInWithPassword, signUpWithPassword, signOut]
     );
 
     return (

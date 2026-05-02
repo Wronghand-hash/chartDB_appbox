@@ -25,11 +25,18 @@ export const supabaseAuthInitialValue: SupabaseAuthContextValue = {
     session: null,
     user: null,
     orgId: null,
-    signInWithPassword: async (_email: string, _password: string) => {},
+    signInWithPassword: async (email: string, password: string) => {
+        void email;
+        void password;
+    },
     signUpWithPassword: async (
-        _email: string,
-        _password: string
-    ): Promise<SignUpResult> => ({ status: 'signed_in' }),
+        email: string,
+        password: string
+    ): Promise<SignUpResult> => {
+        void email;
+        void password;
+        return { status: 'signed_in' };
+    },
     signOut: async () => {},
 };
 

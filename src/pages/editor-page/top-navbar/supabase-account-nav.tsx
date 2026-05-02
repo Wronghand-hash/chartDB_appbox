@@ -16,7 +16,7 @@ export const SupabaseAccountNav: React.FC = () => {
     }
 
     return (
-        <div className="flex max-w-[10rem] items-center gap-1">
+        <div className="flex max-w-40 items-center gap-1">
             <span
                 className="truncate text-xs text-muted-foreground"
                 title={user.email}
