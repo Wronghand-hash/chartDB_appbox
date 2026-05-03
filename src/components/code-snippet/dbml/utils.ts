@@ -1,8 +1,9 @@
 import type { DBMLError } from '@/lib/dbml/dbml-import/dbml-import-error';
 import type * as Monaco from 'monaco-editor';
 
-/** Full monaco module (passed from editor `onMount`); type-only namespace (no runtime `monaco-editor` import). */
-export type MonacoRuntime = Monaco;
+/** Full monaco module (passed from editor `onMount`); avoids static `monaco-editor` value import in this file. */
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports -- TS2709: `import type * as Monaco` is not a valid alias for the runtime namespace type; `typeof import()` is.
+export type MonacoRuntime = typeof import('monaco-editor');
 
 export const highlightErrorLine = ({
     monaco,
