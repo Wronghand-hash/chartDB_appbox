@@ -12,7 +12,7 @@ import {
 } from '@/lib/supabase/diagram-snapshot';
 import type { Diagram } from '@/lib/domain/diagram';
 
-const DEBOUNCE_MS = 1400;
+const DEBOUNCE_MS = 1000;
 
 const fullDiagramLoadOptions = {
     includeTables: true,
@@ -318,7 +318,15 @@ export function useCloudBackedStorage(
         };
 
         return new Proxy(storageInitialValue, {
-            get(_t, prop: keyof StorageContext) {
+            get(_t, prop: string | symbol) {
+                if (prop === 'flushPendingRemoteSync') {
+                    const flushPendingRemoteSync: StorageContext['flushPendingRemoteSync'] =
+                        async (diagramId: string) => {
+                            await flushPush(diagramId);
+                        };
+                    return flushPendingRemoteSync;
+                }
+
                 const target = inner();
                 if (prop === 'listDiagrams') {
                     return remoteListDiagrams;
@@ -333,7 +341,7 @@ export function useCloudBackedStorage(
                     return remoteAddDiagram;
                 }
 
-                const val = target[prop];
+                const val = target[prop as keyof StorageContext];
                 if (typeof val !== 'function') {
                     return val;
                 }
@@ -343,8 +351,16 @@ export function useCloudBackedStorage(
                         val as (...a: unknown[]) => unknown | Promise<unknown>
                     ).apply(target, args as never);
                     const done = (r: unknown) => {
-                        if (cloudActive && MUTATING_KEYS.includes(prop)) {
-                            schedulePush(extractDiagramId(prop, args));
+                        if (
+                            cloudActive &&
+                            MUTATING_KEYS.includes(prop as keyof StorageContext)
+                        ) {
+                            schedulePush(
+                                extractDiagramId(
+                                    prop as keyof StorageContext,
+                                    args
+                                )
+                            );
                         }
                         return r;
                     };

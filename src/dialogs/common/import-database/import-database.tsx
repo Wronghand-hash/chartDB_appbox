@@ -398,10 +398,7 @@ export const ImportDatabase: React.FC<ImportDatabaseProps> = ({
     }, [importMethod]);
 
     const handleEditorDidMount = useCallback(
-        (
-            editorInstance: editor.IStandaloneCodeEditor,
-            monacoNs: Monaco
-        ) => {
+        (editorInstance: editor.IStandaloneCodeEditor, monacoNs: Monaco) => {
             monacoNsRef.current = monacoNs as unknown as MonacoRuntime;
             editorRef.current = editorInstance;
             decorationsCollection.current =

@@ -926,6 +926,7 @@ export const StorageProvider: React.FC<React.PropsWithChildren> = ({
         getDiagramFilter,
         updateDiagramFilter,
         deleteDiagramFilter,
+        flushPendingRemoteSync: async () => {},
     };
 
     const storageValue = useCloudBackedStorage(innerRef);

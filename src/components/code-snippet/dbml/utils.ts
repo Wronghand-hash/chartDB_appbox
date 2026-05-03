@@ -1,8 +1,8 @@
 import type { DBMLError } from '@/lib/dbml/dbml-import/dbml-import-error';
 import type * as Monaco from 'monaco-editor';
 
-/** Full monaco module (passed from editor `onMount`); avoids static `monaco-editor` import in this file. */
-export type MonacoRuntime = typeof import('monaco-editor');
+/** Full monaco module (passed from editor `onMount`); type-only namespace (no runtime `monaco-editor` import). */
+export type MonacoRuntime = Monaco;
 
 export const highlightErrorLine = ({
     monaco,

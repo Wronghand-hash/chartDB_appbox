@@ -8,6 +8,7 @@ import {
 import { useHistory } from '@/hooks/use-history';
 import { useDialog } from '@/hooks/use-dialog';
 import { useChartDB } from '@/hooks/use-chartdb';
+import { useStorage } from '@/hooks/use-storage';
 import { useLayout } from '@/hooks/use-layout';
 import { useReactFlow } from '@xyflow/react';
 
@@ -16,7 +17,8 @@ export const KeyboardShortcutsProvider: React.FC<React.PropsWithChildren> = ({
 }) => {
     const { redo, undo } = useHistory();
     const { openOpenDiagramDialog } = useDialog();
-    const { updateDiagramUpdatedAt } = useChartDB();
+    const { updateDiagramUpdatedAt, currentDiagram } = useChartDB();
+    const storage = useStorage();
     const { toggleSidePanel } = useLayout();
     const { fitView } = useReactFlow();
 
@@ -48,11 +50,19 @@ export const KeyboardShortcutsProvider: React.FC<React.PropsWithChildren> = ({
     useHotkeys(
         keyboardShortcutsForOS[KeyboardShortcutAction.SAVE_DIAGRAM]
             .keyCombination,
-        updateDiagramUpdatedAt,
+        () => {
+            void (async () => {
+                await updateDiagramUpdatedAt();
+                const id = currentDiagram?.id;
+                if (id) {
+                    await storage.flushPendingRemoteSync(id);
+                }
+            })();
+        },
         {
             preventDefault: true,
         },
-        [updateDiagramUpdatedAt]
+        [updateDiagramUpdatedAt, currentDiagram?.id, storage]
     );
     useHotkeys(
         keyboardShortcutsForOS[KeyboardShortcutAction.TOGGLE_SIDE_PANEL]

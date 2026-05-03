@@ -28,6 +28,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useLocalConfig } from '@/hooks/use-local-config';
 import { useNavigate } from 'react-router-dom';
 import { useAlert } from '@/context/alert-context/alert-context';
+import { useStorage } from '@/hooks/use-storage';
 
 export interface MenuProps {}
 
@@ -37,7 +38,9 @@ export const Menu: React.FC<MenuProps> = () => {
         deleteDiagram,
         updateDiagramUpdatedAt,
         databaseType,
+        currentDiagram,
     } = useChartDB();
+    const storage = useStorage();
     const {
         openCreateDiagramDialog,
         openOpenDiagramDialog,
@@ -79,6 +82,14 @@ export const Menu: React.FC<MenuProps> = () => {
     const openDiagram = () => {
         openOpenDiagramDialog();
     };
+
+    const handleSaveDiagram = useCallback(async () => {
+        await updateDiagramUpdatedAt();
+        const id = currentDiagram?.id;
+        if (id) {
+            await storage.flushPendingRemoteSync(id);
+        }
+    }, [updateDiagramUpdatedAt, currentDiagram?.id, storage]);
 
     const exportSVG = useCallback(() => {
         exportImage('svg', {
@@ -165,7 +176,7 @@ export const Menu: React.FC<MenuProps> = () => {
                             }
                         </MenubarShortcut>
                     </MenubarItem>
-                    <MenubarItem onClick={updateDiagramUpdatedAt}>
+                    <MenubarItem onClick={handleSaveDiagram}>
                         {t('menu.actions.save')}
                         <MenubarShortcut>
                             {

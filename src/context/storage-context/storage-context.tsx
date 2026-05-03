@@ -49,6 +49,8 @@ export interface StorageContext {
         attributes: Partial<Diagram>;
     }) => Promise<void>;
     deleteDiagram: (id: string) => Promise<void>;
+    /** When cloud sync is enabled, uploads the latest local diagram immediately (e.g. before tab close). */
+    flushPendingRemoteSync: (diagramId: string) => Promise<void>;
 
     // Table operations
     addTable: (params: { diagramId: string; table: DBTable }) => Promise<void>;
@@ -167,6 +169,7 @@ export const storageInitialValue: StorageContext = {
     getDiagram: emptyFn,
     updateDiagram: emptyFn,
     deleteDiagram: emptyFn,
+    flushPendingRemoteSync: emptyFn,
 
     addTable: emptyFn,
     getTable: emptyFn,

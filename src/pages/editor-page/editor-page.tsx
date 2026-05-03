@@ -23,6 +23,7 @@ import { useDiagramLoader } from './use-diagram-loader';
 import { DiffProvider } from '@/context/diff-context/diff-provider';
 import { TopNavbarMock } from './top-navbar/top-navbar-mock';
 import { DiagramFilterProvider } from '@/context/diagram-filter-context/diagram-filter-provider';
+import { DiagramAutoSave } from './diagram-auto-save';
 
 export const EditorDesktopLayoutLazy = React.lazy(
     () => import('./editor-desktop-layout')
@@ -39,6 +40,7 @@ const EditorPageComponent: React.FC = () => {
 
     return (
         <>
+            <DiagramAutoSave />
             <Helmet>
                 <title>
                     {diagramName
