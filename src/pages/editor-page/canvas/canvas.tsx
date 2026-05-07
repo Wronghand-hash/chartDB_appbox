@@ -125,6 +125,7 @@ import { useClickAway } from 'react-use';
 
 const HIGHLIGHTED_EDGE_Z_INDEX = 1;
 const DEFAULT_EDGE_Z_INDEX = 0;
+const LARGE_DIAGRAM_THRESHOLD = 150;
 
 export type EdgeType =
     | RelationshipEdgeType
@@ -332,6 +333,7 @@ export const Canvas: React.FC<CanvasProps> = ({ initialTables }) => {
         resetFilter,
     } = useDiagramFilter();
     const { checkIfNewTable } = useDiff();
+    const isLargeDiagram = tables.length > LARGE_DIAGRAM_THRESHOLD;
 
     const shouldForceShowTable = useCallback(
         (tableId: string) => {
@@ -517,6 +519,7 @@ export const Canvas: React.FC<CanvasProps> = ({ initialTables }) => {
     useEffect(() => {
         const selectedTableIdsSet = new Set(selectedTableIds);
         const selectedRelationshipIdsSet = new Set(selectedRelationshipIds);
+        const shouldAnimateHighlightedEdges = !isLargeDiagram;
 
         setEdges((prevEdges) => {
             // Check if any edge needs updating
@@ -534,12 +537,14 @@ export const Canvas: React.FC<CanvasProps> = ({ initialTables }) => {
                         (edge as Exclude<EdgeType, TempFloatingEdgeType>).data
                             ?.highlighted ?? false;
                     const currentAnimated = edge.animated ?? false;
+                    const targetAnimated =
+                        shouldBeHighlighted && shouldAnimateHighlightedEdges;
                     const currentZIndex = edge.zIndex ?? 0;
 
                     // Skip if no changes needed
                     if (
                         currentHighlighted === shouldBeHighlighted &&
-                        currentAnimated === shouldBeHighlighted &&
+                        currentAnimated === targetAnimated &&
                         currentZIndex ===
                             (shouldBeHighlighted
                                 ? HIGHLIGHTED_EDGE_Z_INDEX
@@ -558,7 +563,7 @@ export const Canvas: React.FC<CanvasProps> = ({ initialTables }) => {
                                 ...dependencyEdge.data!,
                                 highlighted: shouldBeHighlighted,
                             },
-                            animated: shouldBeHighlighted,
+                            animated: targetAnimated,
                             zIndex: shouldBeHighlighted
                                 ? HIGHLIGHTED_EDGE_Z_INDEX
                                 : DEFAULT_EDGE_Z_INDEX,
@@ -571,7 +576,7 @@ export const Canvas: React.FC<CanvasProps> = ({ initialTables }) => {
                                 ...relationshipEdge.data!,
                                 highlighted: shouldBeHighlighted,
                             },
-                            animated: shouldBeHighlighted,
+                            animated: targetAnimated,
                             zIndex: shouldBeHighlighted
                                 ? HIGHLIGHTED_EDGE_Z_INDEX
                                 : DEFAULT_EDGE_Z_INDEX,
@@ -581,7 +586,7 @@ export const Canvas: React.FC<CanvasProps> = ({ initialTables }) => {
 
             return hasChanges ? newEdges : prevEdges;
         });
-    }, [selectedRelationshipIds, selectedTableIds, setEdges]);
+    }, [selectedRelationshipIds, selectedTableIds, setEdges, isLargeDiagram]);
 
     useEffect(() => {
         // Compute target edge counts per field (same logic as edge creation)
@@ -594,71 +599,144 @@ export const Canvas: React.FC<CanvasProps> = ({ initialTables }) => {
         });
 
         setNodes((prevNodes) => {
-            const newNodes = [
-                ...tables.map((table) => {
-                    const isOverlapping =
-                        (overlapGraph.graph.get(table.id) ?? []).length > 0;
+            const prevNodeById = new Map(
+                prevNodes.map((node) => [node.id, node])
+            );
+            const nextNodes: NodeType[] = [];
+            let hasChanges = false;
 
-                    // Get target edge counts for this table's fields
-                    const tableTargetEdgeCounts: Record<string, number> = {};
-                    table.fields.forEach((field) => {
-                        if (targetEdgeCountsByField[field.id]) {
-                            tableTargetEdgeCounts[field.id] =
-                                targetEdgeCountsByField[field.id];
-                        }
-                    });
+            for (const table of tables) {
+                const isOverlapping =
+                    (overlapGraph.graph.get(table.id) ?? []).length > 0;
 
-                    const node = tableToTableNode(table, {
-                        filter,
-                        databaseType,
-                        filterLoading,
-                        showDBViews,
-                        forceShow: shouldForceShowTable(table.id),
-                        isRelationshipCreatingTarget: false,
-                        targetEdgeCounts: tableTargetEdgeCounts,
-                    });
-
-                    // Check if table uses the highlighted custom type
-                    let hasHighlightedCustomType = false;
-                    if (highlightedCustomType) {
-                        hasHighlightedCustomType = table.fields.some(
-                            (field) =>
-                                field.type.name === highlightedCustomType.name
-                        );
+                const tableTargetEdgeCounts: Record<string, number> = {};
+                table.fields.forEach((field) => {
+                    if (targetEdgeCountsByField[field.id]) {
+                        tableTargetEdgeCounts[field.id] =
+                            targetEdgeCountsByField[field.id];
                     }
+                });
 
-                    return {
-                        ...node,
-                        data: {
-                            ...node.data,
-                            isOverlapping,
-                            highlightOverlappingTables,
-                            hasHighlightedCustomType,
-                        },
-                    };
-                }),
-                ...areas.map((area) =>
-                    areaToAreaNode(area, {
-                        tables,
-                        filter,
-                        databaseType,
-                        filterLoading,
-                    })
-                ),
-                ...notes.map((note) => noteToNoteNode(note)),
-                ...prevNodes.filter(
-                    (n) =>
-                        n.type === 'temp-cursor' ||
-                        n.type === 'create-relationship'
-                ),
-            ];
+                const baseNode = tableToTableNode(table, {
+                    filter,
+                    databaseType,
+                    filterLoading,
+                    showDBViews,
+                    forceShow: shouldForceShowTable(table.id),
+                    isRelationshipCreatingTarget: false,
+                    targetEdgeCounts: tableTargetEdgeCounts,
+                });
 
-            // Check if nodes actually changed
-            if (equal(prevNodes, newNodes)) {
+                const hasHighlightedCustomType = highlightedCustomType
+                    ? table.fields.some(
+                          (field) =>
+                              field.type.name === highlightedCustomType.name
+                      )
+                    : false;
+
+                const prevNode = prevNodeById.get(table.id) as
+                    | TableNodeType
+                    | undefined;
+
+                if (
+                    prevNode?.type === 'table' &&
+                    prevNode.data.table === table &&
+                    prevNode.hidden === baseNode.hidden &&
+                    prevNode.width === baseNode.width &&
+                    prevNode.position.x === baseNode.position.x &&
+                    prevNode.position.y === baseNode.position.y &&
+                    prevNode.data.isOverlapping === isOverlapping &&
+                    prevNode.data.highlightOverlappingTables ===
+                        highlightOverlappingTables &&
+                    prevNode.data.hasHighlightedCustomType ===
+                        hasHighlightedCustomType &&
+                    equal(
+                        prevNode.data.targetEdgeCounts ?? {},
+                        tableTargetEdgeCounts
+                    )
+                ) {
+                    nextNodes.push(prevNode);
+                    continue;
+                }
+
+                hasChanges = true;
+                nextNodes.push({
+                    ...baseNode,
+                    data: {
+                        ...baseNode.data,
+                        isOverlapping,
+                        highlightOverlappingTables,
+                        hasHighlightedCustomType,
+                    },
+                });
+            }
+
+            for (const area of areas) {
+                const nextAreaNode = areaToAreaNode(area, {
+                    tables,
+                    filter,
+                    databaseType,
+                    filterLoading,
+                });
+                const prevAreaNode = prevNodeById.get(area.id) as
+                    | AreaNodeType
+                    | undefined;
+
+                if (
+                    prevAreaNode?.type === 'area' &&
+                    prevAreaNode.data.area === area &&
+                    prevAreaNode.hidden === nextAreaNode.hidden &&
+                    prevAreaNode.position.x === nextAreaNode.position.x &&
+                    prevAreaNode.position.y === nextAreaNode.position.y &&
+                    prevAreaNode.width === nextAreaNode.width &&
+                    prevAreaNode.height === nextAreaNode.height
+                ) {
+                    nextNodes.push(prevAreaNode);
+                    continue;
+                }
+
+                hasChanges = true;
+                nextNodes.push(nextAreaNode);
+            }
+
+            for (const note of notes) {
+                const nextNoteNode = noteToNoteNode(note);
+                const prevNoteNode = prevNodeById.get(note.id) as
+                    | NoteNodeType
+                    | undefined;
+
+                if (
+                    prevNoteNode?.type === 'note' &&
+                    prevNoteNode.data.note === note &&
+                    prevNoteNode.position.x === nextNoteNode.position.x &&
+                    prevNoteNode.position.y === nextNoteNode.position.y &&
+                    prevNoteNode.width === nextNoteNode.width &&
+                    prevNoteNode.height === nextNoteNode.height
+                ) {
+                    nextNodes.push(prevNoteNode);
+                    continue;
+                }
+
+                hasChanges = true;
+                nextNodes.push(nextNoteNode);
+            }
+
+            const transientNodes = prevNodes.filter(
+                (node) =>
+                    node.type === 'temp-cursor' ||
+                    node.type === 'create-relationship'
+            );
+            nextNodes.push(...transientNodes);
+
+            if (
+                !hasChanges &&
+                prevNodes.length === nextNodes.length &&
+                prevNodes.every((node, index) => node === nextNodes[index])
+            ) {
                 return prevNodes;
             }
 
-            return newNodes;
+            return nextNodes;
         });
     }, [
         tables,
@@ -1494,9 +1572,12 @@ export const Canvas: React.FC<CanvasProps> = ({ initialTables }) => {
     }, [hasActiveFilter, tables, filter, databaseType, filterLoading]);
 
     const pulseOverlappingTables = useCallback(() => {
+        if (isLargeDiagram) {
+            return;
+        }
         setHighlightOverlappingTables(true);
         setTimeout(() => setHighlightOverlappingTables(false), 600);
-    }, []);
+    }, [isLargeDiagram]);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const exitEditTableMode = useCallback(
@@ -1776,7 +1857,7 @@ export const Canvas: React.FC<CanvasProps> = ({ initialTables }) => {
 
                             <div
                                 className={`transition-opacity duration-300 ease-in-out ${
-                                    hasOverlappingTables
+                                    hasOverlappingTables && !isLargeDiagram
                                         ? 'opacity-100'
                                         : 'opacity-0'
                                 }`}
@@ -1866,7 +1947,7 @@ export const Canvas: React.FC<CanvasProps> = ({ initialTables }) => {
                     >
                         <Toolbar readonly={readonly} />
                     </Controls>
-                    {showMiniMapOnCanvas && (
+                    {showMiniMapOnCanvas && !isLargeDiagram && (
                         <MiniMap
                             style={{
                                 width: isDesktop ? 100 : 60,

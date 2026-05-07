@@ -1,4 +1,10 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 import type { DBTable } from '@/lib/domain/db-table';
 import { deepCopy, generateId } from '@/lib/utils';
 import { defaultTableColor, randomColor, viewColor } from '@/lib/colors';
@@ -34,6 +40,7 @@ import {
     type DBCustomType,
 } from '@/lib/domain/db-custom-type';
 import { getDefaultPrimaryKeyType } from '@/lib/data/data-types/data-types';
+import equal from 'fast-deep-equal';
 
 export interface ChartDBProviderProps {
     diagram?: Diagram;
@@ -71,11 +78,27 @@ export const ChartDBProvider: React.FC<
         diagram?.customTypes ?? []
     );
     const [notes, setNotes] = useState<Note[]>(diagram?.notes ?? []);
+    const tablesRef = useRef<DBTable[]>(diagram?.tables ?? []);
+    const tablePersistTimersRef = useRef<
+        Map<string, ReturnType<typeof setTimeout>>
+    >(new Map());
 
     const { events: diffEvents } = useDiff();
 
     const [highlightedCustomTypeId, setHighlightedCustomTypeId] =
         useState<string>();
+
+    useEffect(() => {
+        tablesRef.current = tables;
+    }, [tables]);
+
+    useEffect(() => {
+        const tablePersistTimers = tablePersistTimersRef.current;
+        return () => {
+            tablePersistTimers.forEach((timer) => clearTimeout(timer));
+            tablePersistTimers.clear();
+        };
+    }, []);
 
     const diffCalculatedHandler = useCallback((event: DiffCalculatedEvent) => {
         const { tablesToAdd, fieldsToAdd, relationshipsToAdd, areasToAdd } =
@@ -138,6 +161,40 @@ export const ChartDBProvider: React.FC<
     const db = useMemo(
         () => (readonly ? storageInitialValue : storageDB),
         [storageDB, readonly]
+    );
+    const scheduleTablePersist = useCallback(
+        (tableId: string, delayMs = 300) => {
+            const existingTimer = tablePersistTimersRef.current.get(tableId);
+            if (existingTimer) {
+                clearTimeout(existingTimer);
+            }
+
+            const nextTimer = setTimeout(() => {
+                tablePersistTimersRef.current.delete(tableId);
+                const latestTable = tablesRef.current.find(
+                    (table) => table.id === tableId
+                );
+                if (!latestTable) {
+                    return;
+                }
+
+                const updatedAt = new Date();
+                setDiagramUpdatedAt(updatedAt);
+                void Promise.all([
+                    db.updateDiagram({
+                        id: diagramId,
+                        attributes: { updatedAt },
+                    }),
+                    db.updateTable({
+                        id: tableId,
+                        attributes: latestTable,
+                    }),
+                ]);
+            }, delayMs);
+
+            tablePersistTimersRef.current.set(tableId, nextTimer);
+        },
+        [db, diagramId]
     );
 
     const currentDiagram: Diagram = useMemo(
@@ -543,6 +600,12 @@ export const ChartDBProvider: React.FC<
             const tablesToDelete = prevTables.filter(
                 (table) => !updatedTables.some((t) => t.id === table.id)
             );
+            const changedTables = updatedTables.filter((updatedTable) => {
+                const prevTable = prevTables.find(
+                    (t) => t.id === updatedTable.id
+                );
+                return !prevTable || !equal(prevTable, updatedTable);
+            });
 
             const relationshipsToRemove = relationships.filter((relationship) =>
                 tablesToDelete.some(
@@ -586,7 +649,7 @@ export const ChartDBProvider: React.FC<
             });
 
             const promises = [];
-            for (const updatedTable of updatedTables) {
+            for (const updatedTable of changedTables) {
                 promises.push(
                     db.putTable({
                         diagramId,
@@ -686,23 +749,7 @@ export const ChartDBProvider: React.FC<
                     return table;
                 })
             );
-
-            const table = await db.getTable({ diagramId, id: tableId });
-            if (!table) {
-                return;
-            }
-
-            const updatedAt = new Date();
-            setDiagramUpdatedAt(updatedAt);
-            await Promise.all([
-                db.updateDiagram({ id: diagramId, attributes: { updatedAt } }),
-                db.updateTable({
-                    id: tableId,
-                    attributes: {
-                        ...updateTableFn(table),
-                    },
-                }),
-            ]);
+            scheduleTablePersist(tableId);
 
             if (!!prevField && options.updateHistory) {
                 addUndoAction({
@@ -717,7 +764,13 @@ export const ChartDBProvider: React.FC<
                 resetRedoStack();
             }
         },
-        [db, diagramId, setTables, addUndoAction, resetRedoStack, getField]
+        [
+            setTables,
+            addUndoAction,
+            resetRedoStack,
+            getField,
+            scheduleTablePersist,
+        ]
     );
 
     const removeField: ChartDBContext['removeField'] = useCallback(
@@ -759,23 +812,7 @@ export const ChartDBProvider: React.FC<
                     fields: fields.filter((f) => f.id !== fieldId),
                 },
             });
-
-            const table = await db.getTable({ diagramId, id: tableId });
-            if (!table) {
-                return;
-            }
-
-            const updatedAt = new Date();
-            setDiagramUpdatedAt(updatedAt);
-            await Promise.all([
-                db.updateDiagram({ id: diagramId, attributes: { updatedAt } }),
-                db.updateTable({
-                    id: tableId,
-                    attributes: {
-                        ...updateTableFn(table),
-                    },
-                }),
-            ]);
+            scheduleTablePersist(tableId);
 
             if (!!prevField && options.updateHistory) {
                 addUndoAction({
@@ -787,14 +824,13 @@ export const ChartDBProvider: React.FC<
             }
         },
         [
-            db,
-            diagramId,
             setTables,
             addUndoAction,
             resetRedoStack,
             getField,
             getTable,
             events,
+            scheduleTablePersist,
         ]
     );
 
@@ -808,14 +844,6 @@ export const ChartDBProvider: React.FC<
             setTables((tables) => {
                 return tables.map((table) => {
                     if (table.id === tableId) {
-                        db.updateTable({
-                            id: tableId,
-                            attributes: {
-                                ...table,
-                                fields: [...table.fields, field],
-                            },
-                        });
-
                         return { ...table, fields: [...table.fields, field] };
                     }
 
@@ -831,18 +859,7 @@ export const ChartDBProvider: React.FC<
                     fields: [...fields, field],
                 },
             });
-
-            const table = await db.getTable({ diagramId, id: tableId });
-
-            if (!table) {
-                return;
-            }
-
-            const updatedAt = new Date();
-            setDiagramUpdatedAt(updatedAt);
-            await Promise.all([
-                db.updateDiagram({ id: diagramId, attributes: { updatedAt } }),
-            ]);
+            scheduleTablePersist(tableId);
 
             if (options.updateHistory) {
                 addUndoAction({
@@ -854,13 +871,12 @@ export const ChartDBProvider: React.FC<
             }
         },
         [
-            db,
-            diagramId,
             setTables,
             addUndoAction,
             resetRedoStack,
             events,
             getTable,
+            scheduleTablePersist,
         ]
     );
 
